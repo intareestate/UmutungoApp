@@ -20,17 +20,21 @@ const categoryConfigs: Record<string, CategoryConfig> = {
   hospitality: { name: 'Hospitality', eyebrow: 'Stay somewhere memorable', description: 'Hotels, guesthouses, and short stays with clear booking details.', cover: '/properties/apartment-02.jpg', accent: '#9a6f4d', filters: ['All stays', 'Book now'], listings: [listing('hospitality-1', 'Kigali garden guesthouse', 'Kimihurura · Kigali', 'RWF 95,000 / night', 'Book', '2 guests · Breakfast · Wi-Fi', '/properties/apartment-02.jpg', '4.9', true), listing('hospitality-2', 'Quiet serviced apartment', 'Nyarutarama · Kigali', 'RWF 180,000 / night', 'Book', '4 guests · 2 beds · Kitchen', '/properties/apartment-01.jpg', '4.8', true)] },
 };
 
-export function CategoryExperience({ slug }: { slug: string }) {
+export function CategoryExperience({ slug, initialQuery = '', initialLocation = '', initialIntent = '', initialPriceRange = '' }: { slug: string; initialQuery?: string; initialLocation?: string; initialIntent?: string; initialPriceRange?: string }) {
   const category = categoryConfigs[slug] ?? categoryConfigs.houses;
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initialQuery);
   const [filter, setFilter] = useState(category.filters[0]);
   const [saved, setSaved] = useState<string[]>([]);
   const [activeListing, setActiveListing] = useState<Listing | null>(null);
   const listings = useMemo(() => category.listings.filter((item) => {
     const matchesQuery = `${item.title} ${item.location} ${item.detail}`.toLowerCase().includes(query.toLowerCase());
+    const matchesLocation = !initialLocation || initialLocation === 'Kigali' || item.location.toLowerCase().includes(initialLocation.toLowerCase());
+    const matchesIntent = !initialIntent || initialIntent === 'Buy or rent' || (initialIntent === 'Rent' && item.intent === 'For rent') || (initialIntent === 'Buy' && item.intent === 'For sale');
+    const numericPrice = Number(item.price.replace(/[^0-9]/g, ''));
+    const matchesPrice = !initialPriceRange || initialPriceRange === 'Any price' || (initialPriceRange === 'Under RWF 500,000' && numericPrice < 500000) || (initialPriceRange === 'RWF 500,000 - 1,000,000' && numericPrice >= 500000 && numericPrice <= 1000000) || (initialPriceRange === 'Over RWF 1,000,000' && numericPrice > 1000000);
     const matchesFilter = filter.startsWith('All') || (filter === 'For rent' && item.intent === 'For rent') || (filter === 'For sale' && item.intent === 'For sale') || (filter === 'Book now' && item.intent === 'Book') || ['Residential', 'Commercial', 'Private office', 'Open workspace'].includes(filter);
-    return matchesQuery && matchesFilter;
-  }), [category, filter, query]);
+    return matchesQuery && matchesLocation && matchesIntent && matchesPrice && matchesFilter;
+  }), [category, filter, initialIntent, initialLocation, initialPriceRange, query]);
 
   return <><main className="category-experience" style={{ '--category-accent': category.accent } as React.CSSProperties}>
     <header className="category-experience-header"><Link href="/" className="category-back"><Icon name="home" size={15} /> Home</Link><div><span>{category.name}</span><Link href="/">Umutungo <Icon name="arrow" size={14} /></Link></div></header>

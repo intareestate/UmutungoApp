@@ -72,7 +72,7 @@ export default function HomePage() {
     if ((intent === 'Buy' || intent === 'Rent') && !window.localStorage.getItem('umutungo-demo-user')) { requestTenantSignIn(); return; }
     const categorySlugs: Record<string, string> = { House: 'houses', Apartment: 'apartments', Land: 'land', Commercial: 'commercial' };
     if (categorySlugs[type]) {
-      window.location.assign(`/categories/${categorySlugs[type]}?location=${encodeURIComponent(location)}&intent=${encodeURIComponent(intent)}`);
+      window.location.assign(`/categories/${categorySlugs[type]}?location=${encodeURIComponent(location)}&intent=${encodeURIComponent(intent)}&priceRange=${encodeURIComponent(priceRange)}`);
       return;
     }
     setSearchMessage(`Showing ${copy(intent).toLowerCase()} properties in ${copy(location)}.`);
@@ -84,7 +84,16 @@ export default function HomePage() {
     const categorySlugs: Record<string, string> = { Homes: 'houses', Apartments: 'apartments', Land: 'land', 'Commercial spaces': 'commercial' };
     window.location.assign(`/categories/${categorySlugs[category] ?? 'houses'}`);
   };
-  const visibleProperties = selectedCategory ? properties.filter((property) => property.type === categoryTypes[selectedCategory]) : properties;
+  const visibleProperties = properties.filter((property) => {
+    const matchesCategory = !selectedCategory || property.type === categoryTypes[selectedCategory];
+    const matchesType = type === 'Any type' || property.type === type;
+    const matchesLocation = location === 'Kigali' || property.location.toLowerCase().includes(location.toLowerCase());
+    const isRental = property.priceNote.includes('/ month');
+    const matchesIntent = intent === 'Buy or rent' || (intent === 'Rent' && isRental) || (intent === 'Buy' && !isRental);
+    const numericPrice = Number(property.price.replace(/[^0-9]/g, ''));
+    const matchesPrice = priceRange === 'Any price' || (priceRange === 'Under RWF 500,000' && numericPrice < 500000) || (priceRange === 'RWF 500,000 - 1,000,000' && numericPrice >= 500000 && numericPrice <= 1000000) || (priceRange === 'Over RWF 1,000,000' && numericPrice > 1000000);
+    return matchesCategory && matchesType && matchesLocation && matchesIntent && matchesPrice;
+  });
 
   return <div className={`${darkMode ? 'app theme-dark' : 'app'} app-realistic`}>
     <Navbar darkMode={darkMode} onToggleTheme={toggleTheme} language={language} onLanguageChange={setLanguage} />
