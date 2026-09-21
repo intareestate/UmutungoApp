@@ -212,7 +212,9 @@ h1 em, h2 em { color: var(--green); font-style: normal; }
 .property-card:hover { border-color: color-mix(in srgb, var(--green) 55%, var(--line)); box-shadow: 0 24px 44px rgba(9, 35, 17, .16); transform: translateY(-9px); animation-play-state: paused; }
 .property-image { position: relative; height: 268px; overflow: hidden; background: var(--green-soft); }
 .property-image::after { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 43%, rgba(5, 17, 8, .63)); content: ''; pointer-events: none; }
-.property-image-art { object-fit: cover; filter: saturate(.55) brightness(.78); transition: transform .5s ease, filter .5s ease; }
+.property-image-track { display: flex; width: 100%; height: 100%; transition: transform .46s cubic-bezier(.22,.8,.24,1); will-change: transform; }
+.property-image-slide { position: relative; width: 100%; height: 100%; flex: 0 0 100%; overflow: hidden; }
+.property-image-art { object-fit: cover; filter: saturate(.55) brightness(.78); transition: transform .65s cubic-bezier(.2,.75,.25,1), filter .5s ease; }
 .property-card:hover .property-image-art { filter: saturate(.7) brightness(.86); transform: scale(1.06); }
 .image-placeholder { position: absolute; z-index: 1; top: 50%; left: 50%; display: flex; flex-direction: column; align-items: center; color: #fff; text-align: center; transform: translate(-50%, -45%); }
 .image-placeholder span { margin-top: 8px; font-size: 12px; font-weight: 800; }
@@ -997,7 +999,7 @@ h1 em, h2 em { color: var(--green); font-style: normal; }
   z-index: 200 !important;
   top: auto !important;
   right: calc(163px - 2.1cm) !important;
-  bottom: calc(117px - 1cm) !important;
+  bottom: calc(117px - 1.4cm) !important;
   left: auto !important;
   transform: none !important;
 }
@@ -1014,7 +1016,7 @@ h1 em, h2 em { color: var(--green); font-style: normal; }
   .app-realistic .ai-chatbot,
   .category-experience + .ai-chatbot {
     right: calc(156px - 2.1cm) !important;
-    bottom: calc(110px - 1cm) !important;
+    bottom: calc(110px - 1.4cm) !important;
   }
 }
 

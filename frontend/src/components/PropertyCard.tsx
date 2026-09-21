@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Icon } from './Icons';
 import { Language, t } from '../data/translations';
 
@@ -11,12 +11,24 @@ type PropertyCardProps = { language: Language; property: PropertyPlaceholder; fa
 export function PropertyCard({ language, property, favorite, onFavorite, onView }: PropertyCardProps) {
   const images = property.images?.length ? property.images : [property.image];
   const [activeImage, setActiveImage] = useState(0);
+  const [isHovered, setIsHovered] = useState(false);
   const changeImage = (direction: number) => setActiveImage((current) => (current + direction + images.length) % images.length);
 
+  useEffect(() => {
+    if (!isHovered || images.length < 2) return;
+    const interval = window.setInterval(() => setActiveImage((current) => (current + 1) % images.length), 950);
+    return () => window.clearInterval(interval);
+  }, [isHovered, images.length]);
+
+  const startHoverGallery = () => {
+    setIsHovered(true);
+    if (images.length > 1) setActiveImage(1);
+  };
+
   return (
-    <article className="property-card">
+    <article className="property-card" onMouseEnter={startHoverGallery} onMouseLeave={() => setIsHovered(false)}>
       <div className="property-image">
-        <Image key={images[activeImage]} src={images[activeImage]} alt={`${t(language, property.title)} ${t(language, 'property image')} ${activeImage + 1}`} fill sizes="(max-width: 760px) 100vw, 33vw" className="property-image-art" />
+        <div className="property-image-track" style={{ transform: `translateX(-${activeImage * 100}%)` }} aria-live="polite">{images.map((image, index) => <div className="property-image-slide" key={`${image}-${index}`}><Image src={image} alt={`${t(language, property.title)} ${t(language, 'property image')} ${index + 1}`} fill sizes="(max-width: 760px) 100vw, 33vw" className="property-image-art" /></div>)}</div>
         {images.length > 1 && <>
           <button className="property-gallery-arrow property-gallery-prev" type="button" onClick={() => changeImage(-1)} aria-label={t(language, 'Previous property image')}><Icon name="chevron" size={16} /></button>
           <button className="property-gallery-arrow property-gallery-next" type="button" onClick={() => changeImage(1)} aria-label={t(language, 'Next property image')}><Icon name="chevron" size={16} /></button>
