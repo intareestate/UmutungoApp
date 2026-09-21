@@ -6,3 +6,4 @@
 dist/
 build/
 *.tsbuildinfo
+client_secret_*.json

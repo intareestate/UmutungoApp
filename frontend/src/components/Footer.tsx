@@ -6,7 +6,7 @@ export function Footer({ language }: { language: Language }) {
   return (
     <footer className="site-footer" id="contact">
       <div className="container app-download" id="app-download">
-        <div className="app-download-copy"><span className="app-download-kicker">{t(language, 'Coming soon')}</span><h2>{t(language, 'Get the Umutungo app')}</h2><p>{t(language, 'Keep your property search close.')}</p></div>
+        <div className="app-download-copy"><h2>{t(language, 'Get the Umutungo app')}</h2><p>{t(language, 'Keep your property search close.')}</p></div>
         <div className="app-download-options" aria-label={t(language, 'Download links coming soon')}>
           <a className="app-download-option" href="#" aria-disabled="true" title={t(language, 'Download links coming soon')} onClick={(event) => event.preventDefault()}><span className="app-download-icon"><Icon name="googlePlay" size={19} /></span><span><small>{t(language, 'Download on')}</small><strong>{t(language, 'Google Play')}</strong></span></a>
           <a className="app-download-option" href="#" aria-disabled="true" title={t(language, 'Download links coming soon')} onClick={(event) => event.preventDefault()}><span className="app-download-icon"><Icon name="apple" size={19} /></span><span><small>{t(language, 'Download on')}</small><strong>{t(language, 'iOS app')}</strong></span></a>
