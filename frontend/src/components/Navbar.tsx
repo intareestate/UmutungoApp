@@ -18,7 +18,7 @@ type NavbarProps = {
   onLandingVisibilityChange?: (visible: boolean) => void;
 };
 
-const roles = ['Tenant', 'Commissioner / Komisiyoneri', 'Landlord', 'Admin'];
+const authRoles = ['Tenant', 'Commissioner / Komisiyoneri', 'Landlord', 'Admin'];
 const categories = ['Houses', 'Apartments', 'Land', 'Commercial', 'Offices', 'Equipment', 'Hospitality'];
 const languages: Language[] = ['English', 'French', 'Kinyarwanda', 'Swahili'];
 const languageCodes: Record<Language, string> = { English: 'EN', French: 'FR', Kinyarwanda: 'RW', Swahili: 'SW' };
@@ -77,7 +77,6 @@ export function Navbar({ darkMode, onToggleTheme, language, onLanguageChange, is
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [landingVisible, setLandingVisible] = useState(true);
-  const [mobileRoleOpen, setMobileRoleOpen] = useState(false);
   const [mobileCategoryOpen, setMobileCategoryOpen] = useState(false);
   const [mobileLanguageOpen, setMobileLanguageOpen] = useState(false);
   const [roleKey, setRoleKey] = useState('');
@@ -87,6 +86,7 @@ export function Navbar({ darkMode, onToggleTheme, language, onLanguageChange, is
   const accountMenuRef = useRef<HTMLDivElement>(null);
   const mobileAccountMenuRef = useRef<HTMLDivElement>(null);
   const [pendingRole, setPendingRole] = useState<AuthRole | undefined>();
+  const [intendedPath, setIntendedPath] = useState<string | undefined>();
   const [demoSignedIn, setDemoSignedIn] = useState(false);
   const signedIn = isSignedIn || demoSignedIn;
   const isTenant = roleKey === 'Tenant';
@@ -104,7 +104,7 @@ export function Navbar({ darkMode, onToggleTheme, language, onLanguageChange, is
     if (storedUser) {
       try {
         const parsed = JSON.parse(storedUser) as { role?: string };
-        if (roles.includes(parsed.role ?? '')) {
+        if (authRoles.includes(parsed.role ?? '')) {
           setDemoSignedIn(true);
           setRoleKey(parsed.role ?? '');
         }
@@ -142,13 +142,22 @@ export function Navbar({ darkMode, onToggleTheme, language, onLanguageChange, is
     return () => { document.removeEventListener('mousedown', closeOnOutsideClick); document.removeEventListener('keydown', closeOnEscape); };
   }, [accountMenuOpen]);
 
-  const openSignIn = (requestedRole?: AuthRole) => {
+  const openSignIn = (requestedRole?: AuthRole, returnTo?: string) => {
     setPendingRole(requestedRole);
+    setIntendedPath(returnTo);
     setAuthOpen(true);
   };
 
   useEffect(() => {
-    const requestSignIn = () => { if (!signedIn) openSignIn('Tenant'); };
+    const requestSignIn = (event: Event) => {
+      const requestedRole = (event as CustomEvent<{ role?: AuthRole }>).detail?.role;
+      const returnTo = (event as CustomEvent<{ returnTo?: string }>).detail?.returnTo;
+      if (signedIn) {
+        if (requestedRole === 'Commissioner / Komisiyoneri' && roleKey === requestedRole) window.location.assign('/commissioner');
+        return;
+      }
+      openSignIn(requestedRole ?? 'Tenant', returnTo);
+    };
     window.addEventListener('umutungo:request-sign-in', requestSignIn);
     return () => window.removeEventListener('umutungo:request-sign-in', requestSignIn);
   }, [signedIn]);
@@ -169,20 +178,23 @@ export function Navbar({ darkMode, onToggleTheme, language, onLanguageChange, is
     if (dashboardPaths[roleKey]) window.location.assign(dashboardPaths[roleKey]);
   };
 
-  const selectRole = (value: string) => {
-    const selectedRole = roles.find((item) => t(language, item) === value) ?? value;
-    setRoleKey(selectedRole);
-    const dashboardPaths: Record<string, string> = { Tenant: '/tenant', 'Commissioner / Komisiyoneri': '/commissioner', Landlord: '/landlord', Admin: '/admin' };
-    if (selectedRole === 'Tenant' && !signedIn) return;
-    if (dashboardPaths[selectedRole]) {
-      if (signedIn) window.location.assign(dashboardPaths[selectedRole]);
-      else openSignIn(selectedRole as AuthRole);
-    }
-  };
   const openMarket = (event: React.MouseEvent<HTMLAnchorElement>) => {
     if (!signedIn) { event.preventDefault(); setMobileOpen(false); openSignIn('Tenant'); }
   };
-  const postAction = <a className={`nav-link nav-post ${isTenant ? 'nav-post-upgrade' : ''}`} href={isTenant ? '/upgrade' : '#post-property'} aria-label={t(language, postActionHint)}><span className="nav-post-label">{t(language, postActionLabel)}</span></a>;
+  const searchCategory = (value: string) => {
+    const query = value.toLowerCase();
+    if (/\b(apartment|apartments|flat|flats|studio)\b/.test(query)) return 'apartments';
+    if (/\b(land|plot|plots|farm|farmland)\b/.test(query)) return 'land';
+    if (/\b(commercial|office|offices|shop|shops|warehouse|workspace|retail)\b/.test(query)) return 'commercial';
+    return 'houses';
+  };
+  const submitQuickSearch = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const query = quickSearch.trim();
+    if (!query) { goTo('properties'); return; }
+    window.location.assign(`/categories/${searchCategory(query)}?q=${encodeURIComponent(query)}`);
+  };
+  const postAction = <a className={`nav-link nav-post ${isTenant ? 'nav-post-upgrade' : ''}`} href={isTenant ? '/upgrade' : '/post-property'} aria-label={t(language, postActionHint)}><span className="nav-post-label">{t(language, postActionLabel)}</span></a>;
 
   return <>
     <aside className={`site-header ${scrolled ? 'is-scrolled' : ''} ${landingVisible ? '' : 'is-hidden'}`}>
@@ -197,12 +209,11 @@ export function Navbar({ darkMode, onToggleTheme, language, onLanguageChange, is
 
     <header className={`topbar ${scrolled ? 'is-scrolled' : ''}`}>
       <div className="topbar-inner">
-        <a className="topbar-brand" href="#home" aria-label="Umutungo home"><Logo /></a>
-        <form className="topbar-search" role="search" onSubmit={(event) => { event.preventDefault(); goTo('properties'); }}><span className="search-magic"><Icon name="sparkles" size={15} /></span><Icon name="search" size={16} /><input aria-label={t(language, 'Search')} type="search" placeholder="Find a house near stadium" value={quickSearch} onChange={(event) => setQuickSearch(event.target.value)} /><button type="submit" aria-label={t(language, 'Search')}><Icon name="arrow" size={13} /></button></form>
+        <a className="topbar-brand" href="/" aria-label="Umutungo home"><Logo /></a>
+        <form className="topbar-search" role="search" onSubmit={submitQuickSearch}><span className="search-magic"><Icon name="sparkles" size={15} /></span><Icon name="search" size={16} /><input aria-label={t(language, 'Search')} type="search" placeholder="Find a house near stadium" value={quickSearch} onChange={(event) => setQuickSearch(event.target.value)} /><button type="submit" aria-label={t(language, 'Search')}><Icon name="arrow" size={13} /></button></form>
 
         <nav className="desktop-nav" aria-label="Primary navigation">
-          <a className="nav-link active" href="#home"><Icon name="home" size={16} /><span>{t(language, 'Home')}</span></a>
-          <Dropdown label={roleKey ? t(language, roleKey) : t(language, 'Who Am I')} items={roles.map((item) => t(language, item))} active={roleKey ? t(language, roleKey) : ''} onSelect={selectRole} icon="users" />
+          <a className="nav-link active" href="/"><Icon name="home" size={16} /><span>{t(language, 'Home')}</span></a>
           <Dropdown label={t(language, 'Categories')} items={categories.map((item) => t(language, item))} onSelect={openCategory} icon="building" />
           <HoverHint text={t(language, postActionHint)} placement="bottom">{postAction}</HoverHint>
         </nav>
@@ -220,8 +231,7 @@ export function Navbar({ darkMode, onToggleTheme, language, onLanguageChange, is
       </div>
 
       {mobileOpen && <div className="mobile-menu" id="mobile-menu">
-        <a className="mobile-menu-link active" href="#home" onClick={() => setMobileOpen(false)}>{t(language, 'Home')}</a>
-        <div className="mobile-menu-group"><button className="mobile-menu-link" type="button" onClick={() => setMobileRoleOpen(!mobileRoleOpen)}>{roleKey ? t(language, roleKey) : t(language, 'Who Am I')} <Icon name="chevron" size={14} /></button>{mobileRoleOpen && <div className="mobile-submenu">{roles.map((item) => <button key={item} type="button" onClick={() => { selectRole(t(language, item)); setMobileOpen(false); }}>{t(language, item)}{roleKey === item && <Icon name="check" size={14} />}</button>)}</div>}</div>
+        <a className="mobile-menu-link active" href="/" onClick={() => setMobileOpen(false)}>{t(language, 'Home')}</a>
         <div className="mobile-menu-group"><button className="mobile-menu-link" type="button" onClick={() => setMobileCategoryOpen(!mobileCategoryOpen)}>{t(language, 'Categories')} <Icon name="chevron" size={14} /></button>{mobileCategoryOpen && <div className="mobile-submenu mobile-language-submenu">{categories.map((item) => <button key={item} type="button" onClick={() => openCategory(t(language, item))}>{t(language, item)}</button>)}</div>}</div>
         <div className="mobile-account-menu-wrap" ref={mobileAccountMenuRef}>
           <button className="mobile-menu-link mobile-sign-in-link" type="button" aria-expanded={signedIn ? accountMenuOpen : undefined} onClick={signedIn ? () => setAccountMenuOpen((open) => !open) : () => { setMobileOpen(false); onSignIn ? onSignIn() : openSignIn(); }}>{t(language, signedIn ? 'Account' : 'Sign in')}<Icon name={signedIn && accountMenuOpen ? 'chevron' : 'user'} size={15} /></button>
@@ -230,6 +240,6 @@ export function Navbar({ darkMode, onToggleTheme, language, onLanguageChange, is
         <div className="mobile-menu-group"><button className="mobile-menu-link" type="button" onClick={() => setMobileLanguageOpen(!mobileLanguageOpen)}>{t(language, 'Language')} <span><Icon name="globe" size={13} /> {languageCodes[language]}</span></button>{mobileLanguageOpen && <div className="mobile-submenu mobile-language-submenu">{languages.map((item) => <button key={item} type="button" onClick={() => { onLanguageChange(item); setMobileOpen(false); }}>{item}{language === item && <Icon name="check" size={14} />}</button>)}</div>}</div>
       </div>}
     </header>
-    <AuthModal open={authOpen} role={pendingRole} onClose={() => setAuthOpen(false)} onSuccess={(accountRole) => { setDemoSignedIn(true); setRoleKey(accountRole); setAuthOpen(false); const paths: Record<string, string> = { Tenant: '/tenant', 'Commissioner / Komisiyoneri': '/commissioner', Landlord: '/landlord', Admin: '/admin' }; if (pendingRole && paths[pendingRole]) window.location.assign(paths[pendingRole]); else if (paths[accountRole]) window.location.assign(paths[accountRole]); }} />
+    <AuthModal open={authOpen} role={pendingRole} onClose={() => { setAuthOpen(false); setIntendedPath(undefined); }} onSuccess={(accountRole) => { setDemoSignedIn(true); setRoleKey(accountRole); setAuthOpen(false); const paths: Record<string, string> = { Tenant: '/tenant', 'Commissioner / Komisiyoneri': '/commissioner', Landlord: '/landlord', Admin: '/admin' }; const destination = intendedPath ?? (pendingRole && paths[pendingRole]) ?? paths[accountRole] ?? '/'; setIntendedPath(undefined); window.location.assign(destination); }} />
   </>;
 }
