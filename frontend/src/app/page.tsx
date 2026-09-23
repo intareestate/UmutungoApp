@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { AiChatbot } from '../components/AiChatbot';
 import { Footer } from '../components/Footer';
+import { CookieConsent } from '../components/CookieConsent';
 import { Icon } from '../components/Icons';
 import { Navbar } from '../components/Navbar';
 import { PropertyCard, PropertyPlaceholder } from '../components/PropertyCard';
@@ -103,7 +104,7 @@ export default function HomePage() {
         <div className="hero-image"><div className="hero-image-overlay" /><div className="container hero-content"><div className="hero-copy">
           <h1>{copy('Find a place')} <em>{copy('that feels like home.')}</em></h1>
           <p className="hero-lead">{copy('Browse verified homes, land and commercial spaces across Rwanda.')}</p>
-          <div className="hero-actions"><a className="button button-primary" href="/tenant">{copy('Browse properties')} <Icon name="arrow" size={16} /></a><button className="button button-commissioner" type="button" onClick={() => requestSignIn('Commissioner / Komisiyoneri')}>{copy('Join as Commissioner')} <Icon name="arrow" size={16} /></button></div>
+          <div className="hero-actions"><a className="button button-primary" href="/categories/houses">{copy('Browse properties')} <Icon name="arrow" size={16} /></a><button className="button button-commissioner" type="button" onClick={() => requestSignIn('Commissioner / Komisiyoneri')}>{copy('Join as Commissioner')} <Icon name="arrow" size={16} /></button></div>
         </div></div></div>
         <div className="container hero-search-wrap"><PropertySearch language={language} location={location} type={type} intent={intent} priceRange={priceRange} onLocationChange={setLocation} onTypeChange={setType} onIntentChange={(value) => { setIntent(value); if ((value === 'Buy' || value === 'Rent') && !window.localStorage.getItem('umutungo-demo-user')) requestTenantSignIn(); }} onPriceRangeChange={setPriceRange} onSubmit={submitSearch} /></div>
       </section>
@@ -132,6 +133,7 @@ export default function HomePage() {
       <ReviewPanel language={language} />
     </main>
     <Footer language={language} />
+    <CookieConsent />
     {selectedProperty && <PropertyViewer language={language} property={selectedProperty} onClose={() => setSelectedProperty(null)} />}
   </div>;
 }

@@ -18,7 +18,9 @@ const demoAccounts: Array<{ role: AuthRole; email: string; password: string }> =
 ];
 
 function roleLabel(role?: AuthRole) {
-  if (role === 'Commissioner / Komisiyoneri') return 'Commissioner';
+  if (role === 'Tenant') return 'Client';
+  if (role === 'Commissioner / Komisiyoneri') return 'Komisiyoneri';
+  if (role === 'Landlord') return 'Property Owner';
   return role ?? 'your Umutungo account';
 }
 

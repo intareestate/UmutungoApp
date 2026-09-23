@@ -1,13 +1,25 @@
 'use client';
 
 import Image from 'next/image';
-import { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react';
+import { FormEvent, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react';
 import { Icon } from './Icons';
 import { Language, t } from '../data/translations';
 import { PropertyPlaceholder } from './PropertyCard';
+import { AuthModal } from './AuthModal';
 
 type PropertyViewerProps = { language: Language; property: PropertyPlaceholder; onClose: () => void };
 type ViewerMode = 'photos' | 'tour' | 'plan';
+type TransactionType = 'rent' | 'buy';
+type TransactionStep = 'choose' | 'application' | 'payment' | 'success';
+type PaymentMethod = 'momo' | 'airtel' | 'mastercard' | 'visa' | 'other';
+
+function PaymentLogo({ method }: { method: PaymentMethod }) {
+  if (method === 'momo') return <span className="payment-brand payment-brand-momo"><b>m</b><small>MoMo</small></span>;
+  if (method === 'airtel') return <span className="payment-brand payment-brand-airtel"><b>a</b></span>;
+  if (method === 'mastercard') return <span className="payment-brand payment-brand-mastercard"><i /><i /></span>;
+  if (method === 'visa') return <span className="payment-brand payment-brand-visa">VISA</span>;
+  return <span className="payment-brand payment-brand-other"><Icon name="creditCard" size={17} /></span>;
+}
 
 export function PropertyViewer({ language, property, onClose }: PropertyViewerProps) {
   const images = property.images?.length ? property.images : [property.image];
@@ -16,20 +28,111 @@ export function PropertyViewer({ language, property, onClose }: PropertyViewerPr
   const [tourStop, setTourStop] = useState(0);
   const [turn, setTurn] = useState(0);
   const [playerPosition, setPlayerPosition] = useState({ x: 50, y: 62 });
-  const [requestSent, setRequestSent] = useState(false);
+  const [transactionOpen, setTransactionOpen] = useState(false);
+  const [transactionType, setTransactionType] = useState<TransactionType>('rent');
+  const [transactionStep, setTransactionStep] = useState<TransactionStep>('choose');
+  const [authOpen, setAuthOpen] = useState(false);
+  const [signedIn, setSignedIn] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('momo');
+  const [paymentPhone, setPaymentPhone] = useState('');
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvv, setCardCvv] = useState('');
+  const [paymentError, setPaymentError] = useState('');
+  const [applicationName, setApplicationName] = useState('');
+  const [applicationPhone, setApplicationPhone] = useState('');
+  const [applicationMessage, setApplicationMessage] = useState('');
+  const [landlordVisible, setLandlordVisible] = useState(false);
+  const [contactOpen, setContactOpen] = useState(false);
+  const [messageSent, setMessageSent] = useState(false);
+  const [contactMessage, setContactMessage] = useState('');
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewMessage, setReviewMessage] = useState('');
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
   const dragStart = useRef<{ x: number; turn: number } | null>(null);
 
   useEffect(() => {
-    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
+    setSignedIn(Boolean(window.localStorage.getItem('umutungo-demo-user')));
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape' && !authOpen) onClose(); };
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     document.addEventListener('keydown', closeOnEscape);
     return () => { document.body.style.overflow = previousOverflow; document.removeEventListener('keydown', closeOnEscape); };
-  }, [onClose]);
+  }, [authOpen, onClose]);
 
   const changeImage = (direction: number) => setActiveImage((current) => (current + direction + images.length) % images.length);
   const isLand = property.type === 'Land';
   const isCommercial = property.type === 'Commercial';
+  const availableFor = property.availableFor ?? (property.priceNote.includes('/ month') || property.priceNote.includes('/ night') ? 'rent' : 'sale');
+  const availableActions: TransactionType[] = availableFor === 'both' ? ['rent', 'buy'] : [availableFor === 'rent' ? 'rent' : 'buy'];
+  const openTransaction = () => {
+    setTransactionType(availableActions[0]);
+    setTransactionStep('choose');
+    setPaymentMethod('momo');
+    setPaymentPhone('');
+    setCardNumber('');
+    setCardExpiry('');
+    setCardCvv('');
+    setPaymentError('');
+    setApplicationName('');
+    setApplicationPhone('');
+    setApplicationMessage('');
+    setLandlordVisible(false);
+    setContactOpen(false);
+    setMessageSent(false);
+    setContactMessage('');
+    setReviewOpen(false);
+    setReviewRating(5);
+    setReviewMessage('');
+    setReviewSubmitted(false);
+    setTransactionOpen(true);
+  };
+  const handleTransactionContinue = () => {
+    if (!signedIn) { setAuthOpen(true); return; }
+    setPaymentError('');
+    setTransactionStep(transactionType === 'rent' ? 'application' : 'payment');
+  };
+  const handleApplicationSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (applicationPhone.replace(/\D/g, '').length < 9) { setPaymentError('Enter a valid Rwanda phone number.'); return; }
+    const application = { id: `${property.id}-${Date.now()}`, propertyId: property.id, propertyTitle: property.title, applicant: applicationName, phone: applicationPhone, message: applicationMessage, status: 'Submitted', createdAt: new Date().toISOString() };
+    const existing = JSON.parse(window.localStorage.getItem('umutungo-rental-applications') ?? '[]') as typeof application[];
+    window.localStorage.setItem('umutungo-rental-applications', JSON.stringify([application, ...existing]));
+    setPaymentError('');
+    setTransactionStep('success');
+  };
+  const handlePaymentSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const isMobileMoney = paymentMethod === 'momo' || paymentMethod === 'airtel';
+    if (isMobileMoney && paymentPhone.trim().replace(/\D/g, '').length < 9) { setPaymentError('Enter a valid Rwanda phone number to continue.'); return; }
+    if (!isMobileMoney && cardNumber.replace(/\D/g, '').length < 12) { setPaymentError('Enter a valid card number to continue.'); return; }
+    if (!isMobileMoney && (!cardExpiry.trim() || cardCvv.trim().length < 3)) { setPaymentError('Enter your card expiry date and security code.'); return; }
+    setPaymentError('');
+    setPaymentPhone('');
+    setCardNumber('');
+    setCardExpiry('');
+    setCardCvv('');
+    setTransactionStep('success');
+  };
+  const handleReviewSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!reviewMessage.trim()) return;
+    setReviewSubmitted(true);
+    setReviewOpen(false);
+  };
+  const handleLandlordMessage = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!contactMessage.trim()) return;
+    setMessageSent(true);
+  };
+  const paymentOptions: Array<{ id: PaymentMethod; label: string; detail: string; mark: string }> = [
+    { id: 'momo', label: 'MTN MoMo', detail: 'Approve securely on your MoMo phone', mark: 'MoMo' },
+    { id: 'airtel', label: 'Airtel Money', detail: 'Pay from your Airtel Money wallet', mark: 'A' },
+    { id: 'mastercard', label: 'Mastercard', detail: 'Debit or credit card', mark: 'MC' },
+    { id: 'visa', label: 'Visa card', detail: 'Debit or credit card', mark: 'VISA' },
+    { id: 'other', label: 'Other bank card', detail: 'Other supported cards in Rwanda', mark: '•••' },
+  ];
   const tourNames = isLand ? [t(language, 'Site entrance'), t(language, 'Buildable area'), t(language, 'Access road')] : isCommercial ? [t(language, 'Open workspace'), t(language, 'Meeting room'), t(language, 'Reception')] : [t(language, 'Living room'), t(language, 'Kitchen'), t(language, 'Bedroom')];
   const planNames = isLand ? [t(language, 'Plot frontage'), t(language, 'Buildable area'), t(language, 'Access road'), t(language, 'Green buffer')] : isCommercial ? [t(language, 'Open workspace'), t(language, 'Meeting room'), t(language, 'Reception'), t(language, 'Staff area')] : [t(language, 'Living room'), t(language, 'Kitchen'), t(language, 'Bedroom'), t(language, 'Garden')];
   const tourImages = [0, 1, 2].map((index) => images[Math.min(index, images.length - 1)]);
@@ -60,7 +163,7 @@ export function PropertyViewer({ language, property, onClose }: PropertyViewerPr
   return <div className="property-viewer-overlay" role="dialog" aria-modal="true" aria-labelledby="property-viewer-title" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="property-viewer">
       <header className="property-viewer-header">
-        <div><span className="eyebrow">{t(language, 'Verified listing')}</span><h2 id="property-viewer-title">{t(language, property.title)}</h2><p><Icon name="pin" size={14} /> {t(language, property.location)}</p></div>
+        <div><span className="eyebrow">{t(language, 'Verified listing')}</span><h2 id="property-viewer-title">{t(language, property.title)}</h2><p><Icon name="pin" size={14} /> {t(language, property.location)}</p><button className="property-report-link" type="button" onClick={() => { const reason = window.prompt('Report reason: fraud, duplicate, incorrect information, sold/unavailable, offensive content, or other.'); if (reason?.trim()) window.localStorage.setItem('umutungo-listing-report', JSON.stringify({ listingId: property.id, reason: reason.trim(), createdAt: new Date().toISOString() })); }}>Report this listing</button></div>
         <button className="property-viewer-close" type="button" onClick={onClose} aria-label={t(language, 'Close property viewer')}><Icon name="x" size={20} /></button>
       </header>
 
@@ -89,8 +192,98 @@ export function PropertyViewer({ language, property, onClose }: PropertyViewerPr
           <div className="viewer-thumbnails">{images.map((image, index) => <button className={mode === 'photos' && activeImage === index ? 'is-active' : ''} type="button" key={`${image}-thumb-${index}`} onClick={() => { setMode('photos'); setActiveImage(index); }}><Image src={image} alt="" fill sizes="90px" /></button>)}</div>
         </div>
 
-        <aside className="property-viewer-details"><div className="viewer-price-row"><div><span className="property-type">{t(language, property.type)}</span><strong>{property.price}</strong><small>{t(language, property.priceNote)}</small></div><button className="viewer-share" type="button" onClick={() => navigator.clipboard?.writeText(window.location.href)} aria-label={t(language, 'Copy property link')}><Icon name="arrow" size={16} /></button></div><div className="viewer-stats"><span><strong>{property.bedrooms}</strong>{t(language, 'beds')}</span><span><strong>{property.bathrooms}</strong>{t(language, 'baths')}</span><span><strong>{property.area}</strong>m2</span></div><p className="viewer-description">{t(language, 'A carefully presented property with clear details, flexible spaces and a location worth exploring in person.')}</p><div className="viewer-highlights"><span><Icon name="check" size={15} /> {t(language, 'Verified owner')}</span><span><Icon name="check" size={15} /> {t(language, 'Secure enquiries')}</span><span><Icon name="check" size={15} /> {t(language, 'Virtual tour ready')}</span></div><button className="viewer-request-button" type="button" onClick={() => setRequestSent(true)}>{requestSent ? t(language, 'Viewing request sent') : t(language, 'Request a viewing')} <Icon name="arrow" size={16} /></button>{requestSent && <p className="viewer-request-success" role="status">{t(language, 'We will connect you with the property contact.')}</p>}<small className="viewer-listed">{t(language, property.listed)}</small></aside>
+        <aside className="property-viewer-details"><div className="viewer-price-row"><div><span className="property-type">{t(language, property.type)}</span><strong>{property.price}</strong><small>{t(language, property.priceNote)}</small></div><button className="viewer-share" type="button" onClick={() => navigator.clipboard?.writeText(window.location.href)} aria-label={t(language, 'Copy property link')}><Icon name="arrow" size={16} /></button></div><div className="viewer-stats"><span><strong>{property.bedrooms}</strong>{t(language, 'beds')}</span><span><strong>{property.bathrooms}</strong>{t(language, 'baths')}</span><span><strong>{property.area}</strong>m2</span></div><p className="viewer-description">{t(language, 'A carefully presented property with clear details, flexible spaces and a location worth exploring in person.')}</p><div className="viewer-highlights"><span><Icon name="check" size={15} /> {t(language, 'Verified owner')}</span><span><Icon name="check" size={15} /> {t(language, 'Secure enquiries')}</span><span><Icon name="check" size={15} /> {t(language, 'Virtual tour ready')}</span></div><button className="viewer-request-button" type="button" onClick={openTransaction}>{t(language, 'Buy or rent this property')} <Icon name="arrow" size={16} /></button><small className="viewer-listed">{t(language, property.listed)}</small></aside>
       </div>
     </section>
+    {transactionOpen && (
+      <div className="property-action-overlay" role="dialog" aria-modal="true" aria-labelledby="property-action-title">
+        <button className="property-action-backdrop" type="button" aria-label="Close buy or rent options" onClick={() => setTransactionOpen(false)} />
+        <section className={"property-action-panel " + (transactionStep === 'payment' ? 'is-payment-step' : '')}>
+          <button className="property-action-close" type="button" aria-label="Close buy or rent options" onClick={() => setTransactionOpen(false)}><Icon name="x" size={18} /></button>
+
+          {transactionStep === 'choose' && <>
+            <span className="eyebrow">Next step</span>
+            <h2 id="property-action-title">Buy or rent this property</h2>
+            <p className="property-action-intro">Choose how you would like to continue with this listing.</p>
+            <span className="property-availability-badge">{availableFor === 'both' ? 'Available to buy or rent' : availableFor === 'rent' ? 'Available to rent only' : 'Available to buy only'}</span>
+            <div className="property-action-options">
+              {availableActions.map((option) => <button className={"property-action-option " + (transactionType === option ? 'is-selected' : '')} type="button" key={option} onClick={() => { setTransactionType(option); setPaymentError(''); }}>
+                <span className="property-action-option-icon"><Icon name={option === 'rent' ? 'home' : 'building'} size={17} /></span>
+                <span><strong>{option === 'rent' ? 'Rent this property' : 'Buy this property'}</strong><small>{option === 'rent' ? 'Discuss the monthly terms and a viewing.' : 'Discuss the asking price and purchase process.'}</small></span>
+                <Icon name={transactionType === option ? 'check' : 'arrow'} size={15} />
+              </button>)}
+            </div>
+            <button className="property-action-continue" type="button" onClick={handleTransactionContinue}>
+              Continue to {transactionType === 'rent' ? 'rent' : 'buy'} this property <Icon name="arrow" size={16} />
+            </button>
+            <p className="property-action-signin-note"><Icon name="user" size={14} /> Sign in is required before you make a payment or contact the landlord.</p>
+          </>}
+
+          {transactionStep === 'application' && <>
+            <span className="eyebrow">Rental application</span>
+            <h2 id="property-action-title">Apply to rent this property</h2>
+            <p className="property-action-intro">Send your details to the landlord. No payment is required to submit an application.</p>
+            <form className="payment-form" onSubmit={handleApplicationSubmit}>
+              <label>Full name<input value={applicationName} onChange={(event) => setApplicationName(event.target.value)} placeholder="Your full name" required /></label>
+              <label>Rwanda phone number<input type="tel" value={applicationPhone} onChange={(event) => setApplicationPhone(event.target.value)} placeholder="+250 7XX XXX XXX" required /></label>
+              <label>Message <small>Optional</small><textarea value={applicationMessage} onChange={(event) => setApplicationMessage(event.target.value)} placeholder="Tell the landlord a little about your move or preferred viewing time." rows={4} /></label>
+              {paymentError && <p className="payment-error" role="alert">{paymentError}</p>}
+              <button className="property-action-continue" type="submit">Submit rental application <Icon name="arrow" size={16} /></button>
+            </form>
+            <button className="property-flow-back" type="button" onClick={() => setTransactionStep('choose')}><Icon name="arrow" size={13} /> Back to request options</button>
+          </>}
+
+          {transactionStep === 'payment' && <>
+            <span className="eyebrow">Secure payment</span>
+            <h2 id="property-action-title">Pay to continue</h2>
+            <p className="property-action-intro">Choose a payment option available in Rwanda for this {transactionType === 'rent' ? 'rental request' : 'property request'}.</p>
+            <div className="payment-summary"><span>{property.title}</span><strong>{property.price} <small>{property.priceNote}</small></strong></div>
+            <div className="payment-method-grid" aria-label="Payment options">
+              {paymentOptions.map((option) => <button className={"payment-method-card " + (paymentMethod === option.id ? 'is-selected' : '')} type="button" key={option.id} onClick={() => { setPaymentMethod(option.id); setPaymentError(''); }}>
+                <PaymentLogo method={option.id} />
+                <span><strong>{option.label}</strong><small>{option.detail}</small></span>
+                <Icon name={paymentMethod === option.id ? 'check' : 'chevron'} size={14} />
+              </button>)}
+            </div>
+            <form className="payment-form" onSubmit={handlePaymentSubmit}>
+              {(paymentMethod === 'momo' || paymentMethod === 'airtel') && <label>Rwanda phone number<input type="tel" value={paymentPhone} onChange={(event) => setPaymentPhone(event.target.value)} placeholder="+250 7XX XXX XXX" autoComplete="tel" required /></label>}
+              {paymentMethod !== 'momo' && paymentMethod !== 'airtel' && <label>Card number<input inputMode="numeric" value={cardNumber} onChange={(event) => setCardNumber(event.target.value)} placeholder="1234 5678 9012 3456" autoComplete="cc-number" required /></label>}
+              {paymentMethod !== 'momo' && paymentMethod !== 'airtel' && <div className="payment-card-fields"><label>Expiry date<input value={cardExpiry} onChange={(event) => setCardExpiry(event.target.value)} placeholder="MM / YY" autoComplete="cc-exp" required /></label><label>CVV<input inputMode="numeric" value={cardCvv} onChange={(event) => setCardCvv(event.target.value)} placeholder="123" maxLength={4} autoComplete="cc-csc" required /></label></div>}
+              {paymentError && <p className="payment-error" role="alert">{paymentError}</p>}
+              <button className="property-action-continue" type="submit">Pay {property.price} securely <Icon name="arrow" size={16} /></button>
+            </form>
+            <p className="payment-demo-note"><Icon name="check" size={13} /> Demo checkout: no money is charged in this interface.</p>
+            <button className="property-flow-back" type="button" onClick={() => setTransactionStep('choose')}><Icon name="arrow" size={13} /> Back to request options</button>
+          </>}
+
+          {transactionStep === 'success' && <>
+            <span className="payment-success-mark"><Icon name="check" size={23} /></span>
+            <span className="eyebrow">Request received</span>
+            <h2 id="property-action-title">You are on your way</h2>
+            <p className="property-action-intro">Your {transactionType === 'rent' ? 'rental' : 'property'} request for <strong>{property.title}</strong> has been recorded. You can now speak with the landlord directly.</p>
+            <div className="property-landlord-card">
+              <div className="property-landlord-heading"><span className="property-landlord-avatar"><Icon name="user" size={18} /></span><span><strong>Eric N.</strong><small>Verified landlord · {property.location}</small></span></div>
+              <button className="property-landlord-view" type="button" onClick={() => setLandlordVisible((current) => !current)}>{landlordVisible ? 'Hide details' : 'View landlord'} <Icon name="arrow" size={14} /></button>
+              {landlordVisible && <div className="property-landlord-details"><span><b>Phone</b> +250 788 214 600</span><span><b>Email</b> eric.n@umutungo.rw</span><small>Ask about availability, viewing times, deposit terms, and anything else you need to know.</small></div>}
+              <button className="property-contact-button" type="button" onClick={() => setContactOpen(true)}><Icon name="bookPen" size={15} /> Open chat with landlord</button>
+            </div>
+            <div className="property-review-card">
+              <div><span className="eyebrow">After your request</span><h3>How was this property experience?</h3><p>Share a quick review to help other renters make a confident choice.</p></div>
+              {reviewSubmitted ? <p className="property-review-success" role="status"><Icon name="check" size={14} /> Thank you — your review was submitted.</p> : reviewOpen ? <form className="property-review-form" onSubmit={handleReviewSubmit}><div className="property-review-stars" aria-label="Choose a rating">{[1, 2, 3, 4, 5].map((value) => <button key={value} type="button" className={value <= reviewRating ? 'is-selected' : ''} aria-label={value + ' stars'} onClick={() => setReviewRating(value)}>★</button>)}</div><textarea value={reviewMessage} onChange={(event) => setReviewMessage(event.target.value)} placeholder="Tell us about the listing and landlord experience" rows={3} required /><button className="property-review-submit" type="submit">Submit review <Icon name="arrow" size={14} /></button></form> : <button className="property-review-open" type="button" onClick={() => setReviewOpen(true)}>Leave a review <Icon name="arrow" size={14} /></button>}
+            </div>
+          </>}
+        </section>
+        {contactOpen && <div className="landlord-contact-overlay" role="dialog" aria-modal="true" aria-labelledby="landlord-contact-title">
+          <button className="landlord-contact-backdrop" type="button" aria-label="Close landlord chat" onClick={() => setContactOpen(false)} />
+          <section className="landlord-contact-panel">
+            <header className="landlord-contact-header"><div className="property-landlord-heading"><span className="property-landlord-avatar"><Icon name="user" size={18} /></span><span><strong id="landlord-contact-title">Eric N.</strong><small>Verified landlord · Usually replies within an hour</small></span></div><button className="property-action-close" type="button" aria-label="Close landlord chat" onClick={() => setContactOpen(false)}><Icon name="x" size={18} /></button></header>
+            <p className="landlord-contact-intro">Ask about viewing times, availability, deposit terms, or any detail about {property.title}.</p>
+            <div className="landlord-chat-messages"><div className="landlord-chat-bubble landlord-chat-received">Hello, I can help you with this property. What would you like to know?</div>{messageSent && <div className="landlord-chat-bubble landlord-chat-sent">{contactMessage}</div>}</div>
+            {!messageSent ? <form className="landlord-contact-form" onSubmit={handleLandlordMessage}><textarea value={contactMessage} onChange={(event) => setContactMessage(event.target.value)} placeholder="Write your message to the landlord" rows={4} required /><button className="property-contact-button" type="submit">Send message <Icon name="arrow" size={15} /></button></form> : <div className="landlord-contact-sent"><Icon name="check" size={15} /> Message sent. The landlord can reply in this conversation.</div>}
+          </section>
+        </div>}
+      </div>
+    )}
+    <AuthModal open={authOpen} role="Tenant" onClose={() => setAuthOpen(false)} onSuccess={() => { setSignedIn(true); setAuthOpen(false); setPaymentError(''); setTransactionStep(transactionType === 'rent' ? 'application' : 'payment'); }} />
   </div>;
 }

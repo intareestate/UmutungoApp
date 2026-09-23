@@ -1,5 +1,6 @@
 import { ReactElement, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useRouter } from 'next/navigation';
 import { Language, t } from '../data/translations';
 import { Icon } from './Icons';
 import { Logo } from './Logo';
@@ -74,6 +75,7 @@ function AccountPanel({ language, role, darkMode, onToggleTheme, onLanguageChang
 }
 
 export function Navbar({ darkMode, onToggleTheme, language, onLanguageChange, isSignedIn = false, onSignIn, onSignOut, onAccount, onLandingVisibilityChange }: NavbarProps) {
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [landingVisible, setLandingVisible] = useState(true);
@@ -98,6 +100,10 @@ export function Navbar({ darkMode, onToggleTheme, language, onLanguageChange, is
     const slugs: Record<string, string> = { Houses: 'houses', Apartments: 'apartments', Land: 'land', Commercial: 'commercial', Offices: 'offices', Equipment: 'equipment', Hospitality: 'hospitality' };
     if (slugs[category]) window.location.assign(`/categories/${slugs[category]}`);
   };
+
+  useEffect(() => {
+    ['/tenant', '/commissioner', '/landlord', '/admin'].forEach((path) => router.prefetch(path));
+  }, [router]);
 
   useEffect(() => {
     const storedUser = window.localStorage.getItem('umutungo-demo-user');
@@ -153,7 +159,7 @@ export function Navbar({ darkMode, onToggleTheme, language, onLanguageChange, is
       const requestedRole = (event as CustomEvent<{ role?: AuthRole }>).detail?.role;
       const returnTo = (event as CustomEvent<{ returnTo?: string }>).detail?.returnTo;
       if (signedIn) {
-        if (requestedRole === 'Commissioner / Komisiyoneri' && roleKey === requestedRole) window.location.assign('/commissioner');
+        if (requestedRole === 'Commissioner / Komisiyoneri' && roleKey === requestedRole) router.push('/commissioner');
         return;
       }
       openSignIn(requestedRole ?? 'Tenant', returnTo);
@@ -175,7 +181,7 @@ export function Navbar({ darkMode, onToggleTheme, language, onLanguageChange, is
     setAccountMenuOpen(false);
     if (onAccount) { onAccount(); return; }
     const dashboardPaths: Record<string, string> = { Tenant: '/tenant', 'Commissioner / Komisiyoneri': '/commissioner', Landlord: '/landlord', Admin: '/admin' };
-    if (dashboardPaths[roleKey]) window.location.assign(dashboardPaths[roleKey]);
+    if (dashboardPaths[roleKey]) router.push(dashboardPaths[roleKey]);
   };
 
   const openMarket = (event: React.MouseEvent<HTMLAnchorElement>) => {
@@ -194,7 +200,7 @@ export function Navbar({ darkMode, onToggleTheme, language, onLanguageChange, is
     if (!query) { goTo('properties'); return; }
     window.location.assign(`/categories/${searchCategory(query)}?q=${encodeURIComponent(query)}`);
   };
-  const postAction = <a className={`nav-link nav-post ${isTenant ? 'nav-post-upgrade' : ''}`} href={isTenant ? '/upgrade' : '/post-property'} aria-label={t(language, postActionHint)}><span className="nav-post-label">{t(language, postActionLabel)}</span></a>;
+  const postAction = <a className={`nav-link nav-post ${isTenant ? 'nav-post-upgrade' : ''}`} href={isTenant ? '/upgrade' : '/post-property'} onClick={(event) => { if (!signedIn) { event.preventDefault(); setMobileOpen(false); openSignIn('Landlord', '/post-property'); } }} aria-label={t(language, postActionHint)}><span className="nav-post-label">{t(language, postActionLabel)}</span></a>;
 
   return <>
     <aside className={`site-header ${scrolled ? 'is-scrolled' : ''} ${landingVisible ? '' : 'is-hidden'}`}>
@@ -240,6 +246,6 @@ export function Navbar({ darkMode, onToggleTheme, language, onLanguageChange, is
         <div className="mobile-menu-group"><button className="mobile-menu-link" type="button" onClick={() => setMobileLanguageOpen(!mobileLanguageOpen)}>{t(language, 'Language')} <span><Icon name="globe" size={13} /> {languageCodes[language]}</span></button>{mobileLanguageOpen && <div className="mobile-submenu mobile-language-submenu">{languages.map((item) => <button key={item} type="button" onClick={() => { onLanguageChange(item); setMobileOpen(false); }}>{item}{language === item && <Icon name="check" size={14} />}</button>)}</div>}</div>
       </div>}
     </header>
-    <AuthModal open={authOpen} role={pendingRole} onClose={() => { setAuthOpen(false); setIntendedPath(undefined); }} onSuccess={(accountRole) => { setDemoSignedIn(true); setRoleKey(accountRole); setAuthOpen(false); const paths: Record<string, string> = { Tenant: '/tenant', 'Commissioner / Komisiyoneri': '/commissioner', Landlord: '/landlord', Admin: '/admin' }; const destination = intendedPath ?? (pendingRole && paths[pendingRole]) ?? paths[accountRole] ?? '/'; setIntendedPath(undefined); window.location.assign(destination); }} />
+    <AuthModal open={authOpen} role={pendingRole} onClose={() => { setAuthOpen(false); setIntendedPath(undefined); }} onSuccess={(accountRole) => { setDemoSignedIn(true); setRoleKey(accountRole); setAuthOpen(false); const paths: Record<string, string> = { Tenant: '/tenant', 'Commissioner / Komisiyoneri': '/commissioner', Landlord: '/landlord', Admin: '/admin' }; const destination = intendedPath ?? (pendingRole && paths[pendingRole]) ?? paths[accountRole] ?? '/'; setIntendedPath(undefined); router.push(destination); }} />
   </>;
 }

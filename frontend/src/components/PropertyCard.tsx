@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { Icon } from './Icons';
 import { Language, t } from '../data/translations';
 
-export type PropertyPlaceholder = { id: string; title: string; type: string; location: string; price: string; priceNote: string; bedrooms: number; bathrooms: number; area: number; accent: string; image: string; images?: string[]; listed: string };
+export type PropertyPlaceholder = { id: string; title: string; type: string; location: string; price: string; priceNote: string; bedrooms: number; bathrooms: number; area: number; accent: string; image: string; images?: string[]; listed: string; availableFor?: 'rent' | 'sale' | 'both' };
 type PropertyCardProps = { language: Language; property: PropertyPlaceholder; favorite: boolean; onFavorite: () => void; onView: () => void };
 
 export function PropertyCard({ language, property, favorite, onFavorite, onView }: PropertyCardProps) {

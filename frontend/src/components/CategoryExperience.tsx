@@ -2,8 +2,10 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Icon } from './Icons';
 import { AiChatbot } from './AiChatbot';
+import { Icon } from './Icons';
+import type { PropertyPlaceholder } from './PropertyCard';
+import { PropertyViewer } from './PropertyViewer';
 
 type Listing = { id: string; title: string; location: string; price: string; intent: 'For rent' | 'For sale' | 'Book'; detail: string; rating: string; image: string; verified?: boolean };
 type CategoryConfig = { name: string; eyebrow: string; description: string; cover: string; accent: string; filters: string[]; listings: Listing[] };
@@ -18,6 +20,34 @@ const categoryConfigs: Record<string, CategoryConfig> = {
   offices: { name: 'Offices', eyebrow: 'A better place to work', description: 'Professional offices and flexible workspaces for teams building in Rwanda.', cover: '/properties/commercial-02.jpg', accent: '#527b83', filters: ['All offices', 'For rent'], listings: [listing('office-1', 'Flexible office in Kicukiro', 'Kicukiro · Kigali', 'RWF 2,250,000 / month', 'For rent', '240 m² · 2 baths · Parking', '/properties/commercial-02.jpg', '4.8', true), listing('office-2', 'Bright team workspace', 'Kacyiru · Kigali', 'RWF 1,450,000 / month', 'For rent', '120 m² · Furnished · Meeting room', '/properties/commercial-01.jpg', '4.7')] },
   equipment: { name: 'Equipment', eyebrow: 'Tools for the next project', description: 'Practical equipment listings from trusted local owners and businesses.', cover: '/properties/commercial-02.jpg', accent: '#65735f', filters: ['All equipment', 'For rent', 'For sale'], listings: [listing('equipment-1', 'Construction equipment package', 'Kigali · Rwanda', 'RWF 180,000 / day', 'For rent', 'Verified owner · Delivery available', '/properties/commercial-02.jpg', '4.8', true), listing('equipment-2', 'Commercial kitchen equipment', 'Remera · Kigali', 'RWF 7,500,000', 'For sale', 'Good condition · Inspection available', '/properties/commercial-01.jpg', '4.6')] },
   hospitality: { name: 'Hospitality', eyebrow: 'Stay somewhere memorable', description: 'Hotels, guesthouses, and short stays with clear booking details.', cover: '/properties/apartment-02.jpg', accent: '#9a6f4d', filters: ['All stays', 'Book now'], listings: [listing('hospitality-1', 'Kigali garden guesthouse', 'Kimihurura · Kigali', 'RWF 95,000 / night', 'Book', '2 guests · Breakfast · Wi-Fi', '/properties/apartment-02.jpg', '4.9', true), listing('hospitality-2', 'Quiet serviced apartment', 'Nyarutarama · Kigali', 'RWF 180,000 / night', 'Book', '4 guests · 2 beds · Kitchen', '/properties/apartment-01.jpg', '4.8', true)] },
+};
+
+const viewerImages: Record<string, string[]> = {
+  Houses: ['/properties/house-01.jpg', '/properties/house-02.jpg', '/properties/tour-living.jpg', '/properties/tour-kitchen.jpg', '/properties/tour-bedroom-real.jpg'],
+  Apartments: ['/properties/apartment-01.jpg', '/properties/apartment-02.jpg', '/properties/tour-living.jpg', '/properties/tour-kitchen.jpg', '/properties/tour-bedroom-real.jpg'],
+  Land: ['/properties/land-01.jpg', '/properties/kigali-neighborhood.jpg', '/properties/tour-exterior.jpg'],
+  Commercial: ['/properties/commercial-01.jpg', '/properties/commercial-02.jpg', '/properties/tour-interior.jpg', '/properties/tour-kitchen.jpg'],
+  Offices: ['/properties/commercial-02.jpg', '/properties/commercial-01.jpg', '/properties/tour-interior.jpg'],
+  Equipment: ['/properties/commercial-02.jpg', '/properties/commercial-01.jpg', '/properties/tour-interior.jpg'],
+  Hospitality: ['/properties/apartment-02.jpg', '/properties/apartment-01.jpg', '/properties/tour-living.jpg', '/properties/tour-bedroom-real.jpg'],
+};
+
+const shopCategories: Array<{ slug: string; label: string; icon: 'home' | 'building' | 'leaf' | 'users' }> = [
+  { slug: 'houses', label: 'Houses', icon: 'home' },
+  { slug: 'apartments', label: 'Apartments', icon: 'building' },
+  { slug: 'land', label: 'Land', icon: 'leaf' },
+  { slug: 'commercial', label: 'Commercial', icon: 'building' },
+];
+
+const toViewerProperty = (item: Listing, category: CategoryConfig): PropertyPlaceholder => {
+  const priceMatch = item.price.match(/\s*\/\s*(month|night|day)$/);
+  const bedrooms = Number(item.detail.match(/(\d+)\s*beds?/)?.[1] ?? 0);
+  const bathrooms = Number(item.detail.match(/(\d+)\s*baths?/)?.[1] ?? 0);
+  const area = Number(item.detail.match(/(\d+)\s*m(?:²|2)/)?.[1] ?? 0);
+  const type = category.name === 'Houses' ? 'House' : category.name === 'Apartments' || category.name === 'Hospitality' ? 'Apartment' : category.name === 'Land' ? 'Land' : 'Commercial';
+  const images = viewerImages[category.name] ?? [item.image];
+
+  return { id: item.id, title: item.title, type, location: item.location.replace(/\s*·\s*/g, ' - '), price: item.price.replace(/\s*\/\s*(month|night|day)$/, ''), priceNote: priceMatch ? `/ ${priceMatch[1]}` : ' asking', bedrooms, bathrooms, area, accent: category.accent, image: item.image, images: [item.image, ...images.filter((image) => image !== item.image)], listed: 'Listed recently', availableFor: item.intent === 'For sale' ? 'sale' : 'rent' };
 };
 
 export function CategoryExperience({ slug, initialQuery = '', initialLocation = '', initialIntent = '', initialPriceRange = '' }: { slug: string; initialQuery?: string; initialLocation?: string; initialIntent?: string; initialPriceRange?: string }) {
@@ -37,9 +67,9 @@ export function CategoryExperience({ slug, initialQuery = '', initialLocation = 
   }), [category, filter, initialIntent, initialLocation, initialPriceRange, query]);
 
   return <><main className="category-experience" style={{ '--category-accent': category.accent } as React.CSSProperties}>
-    <header className="category-experience-header"><Link href="/" className="category-back"><Icon name="home" size={15} /> Home</Link><div><span>{category.name}</span><Link href="/">Umutungo <Icon name="arrow" size={14} /></Link></div></header>
+    <header className="category-experience-header"><Link href="/" className="category-back"><Icon name="home" size={15} /> Home</Link><nav className="category-shop-nav" aria-label="Property shop categories">{shopCategories.map((item) => <Link className={item.slug === slug ? 'is-active' : ''} href={`/categories/${item.slug}`} key={item.slug}><Icon name={item.icon} size={14} />{item.label}</Link>)}</nav><div><span>{category.name}</span><Link href="/">Umutungo <Icon name="arrow" size={14} /></Link></div></header>
     <section className="category-experience-hero" style={{ backgroundImage: `linear-gradient(90deg, rgba(8, 18, 10, .78), rgba(8, 18, 10, .2)), url(${category.cover})` }}><div><span className="category-experience-eyebrow">{category.eyebrow}</span><h1>Find your next<br /><em>{category.name.toLowerCase()} space.</em></h1><p>{category.description}</p></div><div className="category-search-box"><Icon name="search" size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${category.name.toLowerCase()} by location or feature`} /><button type="button" aria-label="Search category" onClick={() => setQuery(query.trim())}><Icon name="arrow" size={15} /></button></div></section>
     <section className="category-experience-body"><div className="category-results-heading"><div><span className="category-experience-eyebrow">{listings.length} available now</span><h2>Explore {category.name.toLowerCase()}</h2></div><button className="category-map-button" type="button"><Icon name="pin" size={15} /> Map view</button></div><div className="category-filter-row">{category.filters.map((item) => <button className={filter === item ? 'active' : ''} key={item} type="button" onClick={() => setFilter(item)}>{item}</button>)}</div>{listings.length ? <div className="category-listing-grid">{listings.map((item) => <article className="category-listing-card" key={item.id} onClick={() => setActiveListing(item)}><div className="category-listing-image" style={{ backgroundImage: `linear-gradient(180deg, transparent 45%, rgba(5, 15, 8, .64)), url(${item.image})` }}><button className={`category-save ${saved.includes(item.id) ? 'saved' : ''}`} type="button" aria-label={`Save ${item.title}`} onClick={(event) => { event.stopPropagation(); setSaved((current) => current.includes(item.id) ? current.filter((id) => id !== item.id) : [...current, item.id]); }}><Icon name="heart" size={16} filled={saved.includes(item.id)} /></button>{item.verified && <span className="category-verified"><Icon name="check" size={12} /> Verified</span>}</div><div className="category-listing-copy"><div className="category-listing-meta"><span className={`listing-intent ${item.intent === 'For sale' ? 'for-sale' : item.intent === 'For rent' ? 'for-rent' : ''}`}>{item.intent}</span><span className="category-stars">★ {item.rating}</span></div><h3>{item.title}</h3><p><Icon name="pin" size={13} /> {item.location}</p><div className="category-listing-footer"><div><strong>{item.price}</strong><small>{item.detail}</small></div><button className="category-view-button" type="button" onClick={(event) => { event.stopPropagation(); setActiveListing(item); }}>View property <Icon name="arrow" size={13} /></button></div></div></article>)}</div> : <div className="category-empty"><Icon name="search" size={21} /><h3>No listings match that search</h3><p>Try another neighbourhood, property type, or clear the filter.</p><button type="button" onClick={() => { setQuery(''); setFilter(category.filters[0]); }}>Clear search</button></div>}</section>
-    {activeListing && <div className="category-detail-overlay"><button className="category-detail-backdrop" type="button" aria-label="Close property details" onClick={() => setActiveListing(null)} /><aside className="category-detail-panel"><button className="category-detail-close" type="button" onClick={() => setActiveListing(null)} aria-label="Close property details"><Icon name="x" size={17} /></button><div className="category-detail-image" style={{ backgroundImage: `url(${activeListing.image})` }} /><span className="category-experience-eyebrow">{activeListing.verified ? 'Verified listing' : 'Umutungo listing'}</span><h2>{activeListing.title}</h2><p className="category-detail-location"><Icon name="pin" size={14} /> {activeListing.location}</p><strong className="category-detail-price">{activeListing.price}</strong><p className="category-detail-description">{activeListing.detail}. This property has clear information and a local contact ready to answer your questions.</p><div className="category-detail-rating"><span>★★★★★</span><strong>{activeListing.rating}</strong><small>Verified reviews</small></div><button className="category-contact-button" type="button">Contact about this property <Icon name="arrow" size={15} /></button></aside></div>}
+    {activeListing && <PropertyViewer language="English" property={toViewerProperty(activeListing, category)} onClose={() => setActiveListing(null)} />}
   </main><AiChatbot language="English" /></>;
 }

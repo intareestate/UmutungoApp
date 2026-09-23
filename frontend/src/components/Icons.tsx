@@ -2,6 +2,7 @@ export type IconName =
   | 'arrow'
   | 'building'
   | 'check'
+  | 'creditCard'
   | 'chevron'
   | 'download'
   | 'googlePlay'
@@ -33,6 +34,7 @@ export function Icon({ name, size = 18, strokeWidth = 1.8, filled = false }: Ico
     arrow: <><path d="M5 12h13" {...common} /><path d="m13 6 6 6-6 6" {...common} /></>,
     building: <><path d="M4 21h16M6 21V5l6-3 6 3v16M9 9h1M14 9h1M9 13h1M14 13h1M9 17h1M14 17h1" fill="none" {...common} /></>,
     check: <path d="m5 12 4 4L19 6" fill="none" {...common} />,
+    creditCard: <><rect x="3" y="5" width="18" height="14" rx="2" fill="none" {...common} /><path d="M3 10h18M7 15h3" fill="none" {...common} /></>,
     chevron: <path d="m6 9 6 6 6-6" fill="none" {...common} />,
     download: <><path d="M12 3v11M7 10l5 5 5-5M5 21h14" fill="none" {...common} /></>,
     googlePlay: <><path d="M3.6 2.5c-.4.5-.6 1.1-.6 1.9v15.2c0 .8.2 1.4.6 1.9L14.7 12 3.6 2.5Z" fill="#4285F4" /><path d="m15.8 13 3.2 1.8c1.1.6 1.1 1.8 0 2.4l-3.3 1.8-3.6-3 3.7-3Z" fill="#FBBC04" /><path d="m3.6 2.5 11.1 9.5-3.7 3L3.6 2.5Z" fill="#34A853" /><path d="m3.6 21.5 7.4-6.5 3.7 3-11.1 3.5Z" fill="#EA4335" /></>,
