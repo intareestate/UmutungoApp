@@ -54,6 +54,8 @@ export default function HomePage() {
 
   useEffect(() => {
     if (window.localStorage.getItem('umutungo-theme') === 'dark') setDarkMode(true);
+    const storedLanguage = window.localStorage.getItem('umutungo-language') as Language | null;
+    if (storedLanguage && ['English', 'French', 'Kinyarwanda', 'Swahili'].includes(storedLanguage)) setLanguage(storedLanguage);
   }, []);
 
   useEffect(() => {
@@ -72,12 +74,8 @@ export default function HomePage() {
   const submitSearch = () => {
     if ((intent === 'Buy' || intent === 'Rent') && !window.localStorage.getItem('umutungo-demo-user')) { requestTenantSignIn(); return; }
     const categorySlugs: Record<string, string> = { House: 'houses', Apartment: 'apartments', Land: 'land', Commercial: 'commercial' };
-    if (categorySlugs[type]) {
-      window.location.assign(`/categories/${categorySlugs[type]}?location=${encodeURIComponent(location)}&intent=${encodeURIComponent(intent)}&priceRange=${encodeURIComponent(priceRange)}`);
-      return;
-    }
-    setSearchMessage(`Showing ${copy(intent).toLowerCase()} properties in ${copy(location)}.`);
-    document.getElementById('properties')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const shopSlug = categorySlugs[type] ?? 'houses';
+    window.location.assign(`/categories/${shopSlug}?location=${encodeURIComponent(location)}&intent=${encodeURIComponent(intent)}&priceRange=${encodeURIComponent(priceRange)}`);
   };
 
   const toggleFavorite = (id: string) => setFavorites((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
@@ -97,7 +95,7 @@ export default function HomePage() {
   });
 
   return <div className={`${darkMode ? 'app theme-dark' : 'app'} app-realistic`}>
-    <Navbar darkMode={darkMode} onToggleTheme={toggleTheme} language={language} onLanguageChange={setLanguage} />
+    <Navbar darkMode={darkMode} onToggleTheme={toggleTheme} language={language} onLanguageChange={(nextLanguage) => { setLanguage(nextLanguage); window.localStorage.setItem('umutungo-language', nextLanguage); }} />
     <AiChatbot language={language} />
     <main>
       <section className="hero-section" id="home">
@@ -105,20 +103,39 @@ export default function HomePage() {
           <h1>{copy('Find a place')} <em>{copy('that feels like home.')}</em></h1>
           <p className="hero-lead">{copy('Browse verified homes, land and commercial spaces across Rwanda.')}</p>
           <div className="hero-actions"><a className="button button-primary" href="/categories/houses">{copy('Browse properties')} <Icon name="arrow" size={16} /></a><button className="button button-commissioner" type="button" onClick={() => requestSignIn('Commissioner / Komisiyoneri')}>{copy('Join as Commissioner')} <Icon name="arrow" size={16} /></button></div>
-        </div></div></div>
-        <div className="container hero-search-wrap"><PropertySearch language={language} location={location} type={type} intent={intent} priceRange={priceRange} onLocationChange={setLocation} onTypeChange={setType} onIntentChange={(value) => { setIntent(value); if ((value === 'Buy' || value === 'Rent') && !window.localStorage.getItem('umutungo-demo-user')) requestTenantSignIn(); }} onPriceRangeChange={setPriceRange} onSubmit={submitSearch} /></div>
+        </div></div><div className="container hero-search-wrap"><PropertySearch language={language} location={location} type={type} intent={intent} priceRange={priceRange} onLocationChange={setLocation} onTypeChange={setType} onIntentChange={(value) => { setIntent(value); if ((value === 'Buy' || value === 'Rent') && !window.localStorage.getItem('umutungo-demo-user')) requestTenantSignIn(); }} onPriceRangeChange={setPriceRange} onSubmit={submitSearch} /></div></div>
       </section>
 
       <section className="section section-property container" id="properties">
         <div className="section-heading split-heading"><div><p className="eyebrow">{selectedCategory ? copy('Category view') : copy('Featured properties')}</p><h2>{selectedCategory ? copy(selectedCategory) : copy('Places worth')}<br /><em>{selectedCategory ? copy('properties.') : copy('a closer look.')}</em></h2></div><p className="section-description">{selectedCategory ? `${visibleProperties.length} ${copy('properties found in this category.')}` : copy('A small selection of homes currently available in Kigali.')}</p></div>
         {searchMessage && <div className="search-feedback" role="status"><Icon name="check" size={16} /> {searchMessage}</div>}
         <div className="property-grid">{visibleProperties.map((property) => <PropertyCard key={property.id} language={language} property={property} favorite={favorites.includes(property.id)} onFavorite={() => toggleFavorite(property.id)} onView={() => setSelectedProperty(property)} />)}</div>
-        {selectedCategory ? <button className="category-reset" type="button" onClick={() => { setSelectedCategory(''); setType('Any type'); }}>{copy('Show all properties')}</button> : <p className="placeholder-note"><span /> {copy('More verified listings are being added.')}</p>}
+        {selectedCategory && <button className="category-reset" type="button" onClick={() => { setSelectedCategory(''); setType('Any type'); }}>{copy('Show all properties')}</button>}
       </section>
 
       <section className="category-section section container" id="categories">
         <div className="section-heading split-heading"><div><p className="eyebrow">{copy('Browse by category')}</p><h2>{copy('Find your kind')}<br /><em>{copy('of place.')}</em></h2></div><p className="section-description">{copy('Choose a starting point, then narrow it down by area, budget and what matters to you.')}</p></div>
         <div className="category-grid premium-category-grid">{categories.map((category) => <button className="premium-category-card" type="button" key={category.name} onClick={() => selectCategory(category.name)}><span className="premium-category-image" style={{ backgroundImage: `url(${category.image})` }} /><span className="premium-category-copy"><strong>{copy(category.name)}</strong><small>{copy(category.detail)}</small><Icon name="arrow" size={15} /></span></button>)}</div>
+      </section>
+
+      <section className="info-section how-it-works-section" id="how-it-works">
+        <div className="container">
+          <div className="section-heading split-heading"><div><p className="eyebrow">{copy('How Umutungo works')}</p><h2>{copy('Find where')}<br /><em>{copy('you belong.')}</em></h2></div><p className="section-description">{copy('We are here for everyone who wants a place to live — the easy, trusted and comfortable way.')}</p></div>
+          <div className="process-grid">
+            <article className="process-card"><span className="process-number">01</span><Icon name="search" size={22} /><h3>{copy('Easy to explore')}</h3><p>{copy('Clear places, clear next steps')}</p></article>
+            <article className="process-card"><span className="process-number">02</span><Icon name="check" size={22} /><h3>{copy('Built on trust')}</h3><p>{copy('Better information for everyone')}</p></article>
+            <article className="process-card"><span className="process-number">03</span><Icon name="globe" size={22} /><h3>{copy('Made for Rwanda')}</h3><p>{copy('Rooted in how we live')}</p></article>
+          </div>
+          <a className="text-arrow-link" href="#properties">{copy('Explore spaces')} <Icon name="arrow" size={15} /></a>
+        </div>
+      </section>
+
+      <section className="info-section about-section" id="about">
+        <div className="container about-interface"><div className="about-panel"><p className="eyebrow">{copy('Why Umutungo')}</p><h2>{copy('Property search,')}<br /><em>{copy('made clearer.')}</em></h2><p>{copy('The useful details, in one place, so the next step feels easier.')}</p><a className="button button-primary" href="#properties">{copy('Find a property')} <Icon name="arrow" size={15} /></a></div><div className="about-feature-list"><article><Icon name="check" size={20} /><div><h3>{copy('Verified listings')}</h3><p>{copy('Clear details on the places we feature.')}</p></div></article><article><Icon name="users" size={20} /><div><h3>{copy('Local agents')}</h3><p>{copy('Speak to people who know the area and the market.')}</p></div></article><article><Icon name="heart" size={20} /><div><h3>{copy('Compare with ease')}</h3><p>{copy('See price, space and location before you visit.')}</p></div></article></div></div>
+      </section>
+
+      <section className="contact-interface" id="contact">
+        <div className="container contact-interface-grid"><div><p className="eyebrow">{copy('Connect')}</p><h2>{copy('Every place has a story.')}<br /><em>{copy('Let’s help you find yours.')}</em></h2><p className="contact-interface-copy">{copy('We are building a property experience where every person in the journey can move with more clarity and confidence.')}</p><a className="contact-email" href="mailto:hello@umutungo.rw">hello@umutungo.rw <Icon name="arrow" size={15} /></a></div><form className="contact-interface-form" action="mailto:hello@umutungo.rw" method="post" encType="text/plain"><label><span>{copy('Name')}</span><input name="name" placeholder={copy('Your name')} required /></label><label><span>{copy('Email address')}</span><input name="email" type="email" placeholder="you@example.com" required /></label><label><span>{copy('Message')}</span><textarea name="message" placeholder={copy('How can we help?')} rows={4} required /></label><button className="button button-primary" type="submit">{copy('Send message')} <Icon name="arrow" size={15} /></button></form></div>
       </section>
 
       <section className="neighbourhood-section section container" id="explore">

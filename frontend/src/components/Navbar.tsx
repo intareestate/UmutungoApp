@@ -82,7 +82,6 @@ export function Navbar({ darkMode, onToggleTheme, language, onLanguageChange, is
   const [mobileCategoryOpen, setMobileCategoryOpen] = useState(false);
   const [mobileLanguageOpen, setMobileLanguageOpen] = useState(false);
   const [roleKey, setRoleKey] = useState('');
-  const [quickSearch, setQuickSearch] = useState('');
   const [authOpen, setAuthOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement>(null);
@@ -90,6 +89,9 @@ export function Navbar({ darkMode, onToggleTheme, language, onLanguageChange, is
   const [pendingRole, setPendingRole] = useState<AuthRole | undefined>();
   const [intendedPath, setIntendedPath] = useState<string | undefined>();
   const [demoSignedIn, setDemoSignedIn] = useState(false);
+  const [notificationCount, setNotificationCount] = useState(0);
+  const [notifications, setNotifications] = useState<Array<{ title?: string; message?: string; createdAt?: string }>>([]);
+  const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
   const signedIn = isSignedIn || demoSignedIn;
   const isTenant = roleKey === 'Tenant';
   const postActionLabel = isTenant ? 'Upgrade to Post' : 'Post a Property';
@@ -126,6 +128,50 @@ export function Navbar({ darkMode, onToggleTheme, language, onLanguageChange, is
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  useEffect(() => {
+    const readNotificationCount = () => {
+      try {
+        const stored = JSON.parse(window.localStorage.getItem('umutungo-notifications') ?? '[]');
+        const items = Array.isArray(stored) ? stored : [];
+        setNotifications(items);
+        setNotificationCount(items.length);
+      } catch {
+        setNotifications([]);
+        setNotificationCount(0);
+      }
+    };
+    readNotificationCount();
+    window.addEventListener('umutungo:notifications-changed', readNotificationCount);
+    return () => window.removeEventListener('umutungo:notifications-changed', readNotificationCount);
+  }, []);
+
+  useEffect(() => {
+    const label = notificationCount > 99 ? '99+' : String(notificationCount);
+    document.querySelectorAll('.nav-notifications b, .notification-action b').forEach((badge) => {
+      const element = badge as HTMLElement;
+      element.textContent = label;
+      element.style.setProperty('display', notificationCount > 0 ? 'grid' : 'none', 'important');
+    });
+  }, [notificationCount]);
+
+  useEffect(() => {
+    if (!signedIn) {
+      setNotificationPanelOpen(false);
+      return;
+    }
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('.nav-notifications, .notification-action') && !target.closest('.notification-panel')) setNotificationPanelOpen(false);
+    };
+    const toggleFromBell = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (target.closest('.nav-notifications, .notification-action')) setNotificationPanelOpen((open) => !open);
+    };
+    document.addEventListener('mousedown', closeOnOutsideClick);
+    document.addEventListener('click', toggleFromBell);
+    return () => { document.removeEventListener('mousedown', closeOnOutsideClick); document.removeEventListener('click', toggleFromBell); };
+  }, [signedIn]);
 
   useEffect(() => {
     const landing = document.getElementById('home');
@@ -187,19 +233,6 @@ export function Navbar({ darkMode, onToggleTheme, language, onLanguageChange, is
   const openMarket = (event: React.MouseEvent<HTMLAnchorElement>) => {
     if (!signedIn) { event.preventDefault(); setMobileOpen(false); openSignIn('Tenant'); }
   };
-  const searchCategory = (value: string) => {
-    const query = value.toLowerCase();
-    if (/\b(apartment|apartments|flat|flats|studio)\b/.test(query)) return 'apartments';
-    if (/\b(land|plot|plots|farm|farmland)\b/.test(query)) return 'land';
-    if (/\b(commercial|office|offices|shop|shops|warehouse|workspace|retail)\b/.test(query)) return 'commercial';
-    return 'houses';
-  };
-  const submitQuickSearch = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const query = quickSearch.trim();
-    if (!query) { goTo('properties'); return; }
-    window.location.assign(`/categories/${searchCategory(query)}?q=${encodeURIComponent(query)}`);
-  };
   const postAction = <a className={`nav-link nav-post ${isTenant ? 'nav-post-upgrade' : ''}`} href={isTenant ? '/upgrade' : '/post-property'} onClick={(event) => { if (!signedIn) { event.preventDefault(); setMobileOpen(false); openSignIn('Landlord', '/post-property'); } }} aria-label={t(language, postActionHint)}><span className="nav-post-label">{t(language, postActionLabel)}</span></a>;
 
   return <>
@@ -215,17 +248,21 @@ export function Navbar({ darkMode, onToggleTheme, language, onLanguageChange, is
 
     <header className={`topbar ${scrolled ? 'is-scrolled' : ''}`}>
       <div className="topbar-inner">
-        <a className="topbar-brand" href="/" aria-label="Umutungo home"><Logo /></a>
-        <form className="topbar-search" role="search" onSubmit={submitQuickSearch}><span className="search-magic"><Icon name="sparkles" size={15} /></span><Icon name="search" size={16} /><input aria-label={t(language, 'Search')} type="search" placeholder="Find a house near stadium" value={quickSearch} onChange={(event) => setQuickSearch(event.target.value)} /><button type="submit" aria-label={t(language, 'Search')}><Icon name="arrow" size={13} /></button></form>
-
+        <div className="topbar-brand-group">
+          <a className="topbar-brand" href="/" aria-label="Umutungo home"><Logo /></a>
+          <a className="nav-home-link" href="/"><span>{t(language, 'Home')}</span></a>
+        </div>
         <nav className="desktop-nav" aria-label="Primary navigation">
-          <a className="nav-link active" href="/"><Icon name="home" size={16} /><span>{t(language, 'Home')}</span></a>
-          <Dropdown label={t(language, 'Categories')} items={categories.map((item) => t(language, item))} onSelect={openCategory} icon="building" />
-          <HoverHint text={t(language, postActionHint)} placement="bottom">{postAction}</HoverHint>
+          <a className="nav-link" href="/how-it-works"><span>{t(language, 'How it works')}</span></a>
+          <a className="nav-link" href="/about"><span>{t(language, 'About us')}</span></a>
+          <a className="nav-link" href="/categories"><span>{t(language, 'Categories')}</span></a>
+          <a className="nav-contact-link" href="/#contact">{t(language, 'Contact us')}</a>
         </nav>
 
         <div className="nav-actions">
+          <HoverHint text={t(language, postActionHint)} placement="bottom">{postAction}</HoverHint>
           <button className="nav-saved" type="button" title={t(language, 'Favorites')} aria-label={t(language, 'Favorites')} onClick={() => goTo('properties')}><Icon name="heart" size={17} /></button>
+          <button className="nav-notifications" type="button" title={t(language, 'Notifications')} aria-label={t(language, 'Notifications')}><Icon name="bell" size={17} /><b>0</b></button>
           <div className="nav-utility-group" aria-label="Site preferences"><Dropdown label={languageCodes[language]} items={languages} active={language} onSelect={(value) => onLanguageChange(value as Language)} icon="globe" /><ThemeToggle darkMode={darkMode} onToggle={onToggleTheme} language={language} /></div>
           <div className="account-menu-wrap" ref={accountMenuRef}>
             <button className={`nav-sign-in ${signedIn ? 'nav-account' : ''}`} type="button" title={t(language, signedIn ? 'Account' : 'Sign in')} aria-label={t(language, signedIn ? 'Account' : 'Sign in')} aria-expanded={signedIn ? accountMenuOpen : undefined} onClick={signedIn ? () => setAccountMenuOpen((open) => !open) : () => (onSignIn ? onSignIn() : openSignIn())}>{signedIn && <Icon name="user" size={16} />}{t(language, signedIn ? 'Account' : 'Sign in')}{signedIn && <Icon name="chevron" size={12} />}</button>
@@ -238,6 +275,9 @@ export function Navbar({ darkMode, onToggleTheme, language, onLanguageChange, is
 
       {mobileOpen && <div className="mobile-menu" id="mobile-menu">
         <a className="mobile-menu-link active" href="/" onClick={() => setMobileOpen(false)}>{t(language, 'Home')}</a>
+        <a className="mobile-menu-link" href="/how-it-works" onClick={() => setMobileOpen(false)}>{t(language, 'How it works')}</a>
+        <a className="mobile-menu-link" href="/about" onClick={() => setMobileOpen(false)}>{t(language, 'About us')}</a>
+        <a className="mobile-menu-link mobile-contact-link" href="/#contact" onClick={() => setMobileOpen(false)}>{t(language, 'Contact us')} <Icon name="arrow" size={14} /></a>
         <div className="mobile-menu-group"><button className="mobile-menu-link" type="button" onClick={() => setMobileCategoryOpen(!mobileCategoryOpen)}>{t(language, 'Categories')} <Icon name="chevron" size={14} /></button>{mobileCategoryOpen && <div className="mobile-submenu mobile-language-submenu">{categories.map((item) => <button key={item} type="button" onClick={() => openCategory(t(language, item))}>{t(language, item)}</button>)}</div>}</div>
         <div className="mobile-account-menu-wrap" ref={mobileAccountMenuRef}>
           <button className="mobile-menu-link mobile-sign-in-link" type="button" aria-expanded={signedIn ? accountMenuOpen : undefined} onClick={signedIn ? () => setAccountMenuOpen((open) => !open) : () => { setMobileOpen(false); onSignIn ? onSignIn() : openSignIn(); }}>{t(language, signedIn ? 'Account' : 'Sign in')}<Icon name={signedIn && accountMenuOpen ? 'chevron' : 'user'} size={15} /></button>
